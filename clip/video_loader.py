@@ -5,7 +5,7 @@ import os
 import numpy as np
 import ffmpeg
 import math
-
+import csv
 
 def convert_to_float(frac_str):
     try:
@@ -37,6 +37,7 @@ class VideoLoader(Dataset):
             centercrop=False,
             overwrite=False,
             model_version="ViT-B/32",
+            scenedetect_folder="/saltpool0/data/pyp/vqhighlight/scenedetect27/"
     ):
         """
         Args:
@@ -47,6 +48,23 @@ class VideoLoader(Dataset):
         self.framerate = framerate
         self.overwrite = overwrite
         self.model_version = model_version
+
+        # get a dict of vid:[time_slots]
+        self.vid2clips = {}
+        for vfn in self.csv['video_path']:
+            vid = os.path.basename(vfn)[:-4] # exclude ".mkv"
+            temp = vid.split("_")
+            start, end = temp[-2], temp[-1]
+            suffix = "_" + start + "_" + end
+            ytvid = vid[:-len(suffix)]
+            start, end = float(start), float(end)
+            anuj_vid = ytvid + "_" + str(int(start)) + "_" + str(int(end))
+            detect_csv_fn = os.path.join(scenedetect_folder, anuj_vid + "-Scene.csv")
+            with open(detect_csv_fn, newline='') as f:
+                data = csv.reader(f)
+                for row in data:
+                    assert row[0] == 'Timecode List:', f"{row}"
+                    self.vid2clips[vid] = row[1:] # ['00:00:01.967', '00:00:06.667', '00:00:07.267', '00:00:07.867', ...]
 
     def __len__(self):
         return len(self.csv)
@@ -102,26 +120,34 @@ class VideoLoader(Dataset):
                     print(duration, fps)
             except Exception:
                 fps = self.framerate
-            cmd = (
-                ffmpeg
-                .input(video_path)
-                .filter('fps', fps=fps)
-                .filter('scale', width, height)
-            )
-            if self.centercrop:
-                x = int((width - self.size) / 2.0)
-                y = int((height - self.size) / 2.0)
-                cmd = cmd.crop(x, y, self.size, self.size)
-            out, _ = (
-                cmd.output('pipe:', format='rawvideo', pix_fmt='rgb24')
-                .run(capture_stdout=True, quiet=True)
-            )
-            if self.centercrop and isinstance(self.size, int):
-                height, width = self.size, self.size
-            video = np.frombuffer(out, np.uint8).reshape(
-                [-1, height, width, 3])
-            video = th.from_numpy(video.astype('float32'))
-            video = video.permute(0, 3, 1, 2)
+            all_video = []
+            all_len = []
+            time_slots = self.vid2clips[os.path.basename(video_path)[:-4]]
+            for i in range(len(time_slots)-1):
+                start, end = time_slots[i], time_slots[i+1]
+                cmd = (
+                    ffmpeg
+                    .input(video_path, ss=start, sseof=end)
+                    .filter('fps', fps=fps)
+                    .filter('scale', width, height)
+                )
+                if self.centercrop:
+                    x = int((width - self.size) / 2.0)
+                    y = int((height - self.size) / 2.0)
+                    cmd = cmd.crop(x, y, self.size, self.size)
+                out, _ = (
+                    cmd.output('pipe:', format='rawvideo', pix_fmt='rgb24')
+                    .run(capture_stdout=True, quiet=True)
+                )
+                if self.centercrop and isinstance(self.size, int):
+                    height, width = self.size, self.size
+                video = np.frombuffer(out, np.uint8).reshape(
+                    [-1, height, width, 3])
+                video = th.from_numpy(video.astype('float32'))
+                all_video.append(video.permute(0, 3, 1, 2))
+                all_len.append(len(video))
+            all_video = th.cat(all_video)
         else:
-            video = th.zeros(1)
-        return {'video': video, 'input': video_path, 'output': output_file}
+            all_video = th.zeros(1)
+            all_len = 1
+        return {'video': all_video, 'all_len': all_len, 'input': video_path, 'output': output_file}

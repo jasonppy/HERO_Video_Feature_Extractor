@@ -33,6 +33,9 @@ parser.add_argument('--num_decoding_thread', type=int, default=4,
 parser.add_argument('--model_version', type=str, default="ViT-B/32",
                     choices=["ViT-B/32", "RN50x4"],
                     help='Num parallel thread for video decoding')
+parser.add_argument(
+        '--scenedetect_folder', type=str, default="/saltpool0/data/pyp/vqhighlight/scenedetect27/"
+            )
 args = parser.parse_args()
 
 # model_version = "RN50x4" # "RN50x4"  # "ViT-B/32"
@@ -43,7 +46,8 @@ dataset = VideoLoader(
     size=224 if args.model_version == "ViT-B/32" else 288,
     centercrop=True,
     overwrite=args.overwrite,
-    model_version=args.model_version
+    model_version=args.model_version,
+    scenedetect_folder=args.scenedetect_folder
 )
 n_dataset = len(dataset)
 sampler = RandomSequenceSampler(n_dataset, 10)
@@ -87,13 +91,18 @@ with th.no_grad():
                 features = features.cpu().numpy()
                 if args.half_precision:
                     features = features.astype('float16')
+                feature_dict = {}
+                cur_s = 0
+                for i, cur_len in enumerate(data['all_len']):
+                    cur_e = cur_s + cur_len
+                    feature_dict[i] = features[cur_s:cur_e]
                 totatl_num_frames += features.shape[0]
                 # safeguard output path before saving
                 dirname = os.path.dirname(output_file)
                 if not os.path.exists(dirname):
                     print(f"Output directory {dirname} does not exists, creating...")
                     os.makedirs(dirname)
-                np.savez(output_file, features=features)
+                np.savez(output_file, *features_dict)
         else:
             print(f'{input_file}, failed at ffprobe.\n')
 

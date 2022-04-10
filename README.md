@@ -155,7 +155,7 @@ Note that the docker image is different from the one used for the above three fe
 cd ./clip
 
 # docker image should be automatically pulled
-CUDA_VISIBLE_DEVICES=0 source launch_container.sh $PATH_TO_STORAGE/raw_video_dir $PATH_TO_STORAGE/feature_output_dir
+CUDA_VISIBLE_DEVICES=0 source launch_container.sh "/saltpool0/data/pyp/vqhighlight/"
 ```
 
 1. Generate a csv file with input and output files

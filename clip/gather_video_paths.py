@@ -4,12 +4,13 @@ import json
 COMMON_VIDEO_ETX = set([
     ".webm", ".mpg", ".mpeg", ".mpv", ".ogg",
     ".mp4", ".m4p", ".mpv", ".avi", ".wmv", ".qt",
-    ".mov", ".flv", ".swf"])
+    ".mov", ".flv", ".swf", ".mkv"])
+COMMON_VIDEO_ETX = set([".mkv"])
 
 
 def main(opts):
     videopath = opts.video_path
-    feature_path = opts.feature_path
+    feature_path = os.path.join(opts.feature_path, os.path.basename(opts.scenedetect_folder))
     csv_folder = opts.csv_folder
     if not os.path.exists(csv_folder):
         os.mkdir(csv_folder)
@@ -47,15 +48,18 @@ def main(opts):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video_path", default="/video/", type=str,
+    parser.add_argument("--video_path", default="/vqhighlight/video/", type=str,
                         help="The input video path.")
-    parser.add_argument("--feature_path", default="/output/clip-vit_features",
+    parser.add_argument("--feature_path", default="/vqhighlight/scenedetect_features/",
                         type=str, help="output feature path.")
     parser.add_argument(
-        '--csv_folder', type=str, default="/output/csv",
+        '--csv_folder', type=str, default="/vqhighlight",
         help='output csv folder')
     parser.add_argument(
         '--corrupted_id_file', type=str, default="",
         help='corrupted id file')
+    parser.add_argument(
+        '--scenedetect_folder', type=str, default="/vqhighlight/scenedetect27/"
+            )
     args = parser.parse_args()
     main(args)

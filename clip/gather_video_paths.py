@@ -22,7 +22,7 @@ def main(opts):
     else:
         corrupted_ids = None
 
-    outputFile = f"{csv_folder}/clip-vit_info.csv"
+    outputFile = f"{csv_folder}/{os.path.basename(opts.scenedetect_folder)}-clip-vit_info.csv"
     with open(outputFile, "w") as fw:
         fw.write("video_path,feature_path\n")
         fileList = []
@@ -48,18 +48,31 @@ def main(opts):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video_path", default="/vqhighlight/video/", type=str,
+    # parser.add_argument("--video_path", default="/vqhighlight/video/", type=str,
+    #                     help="The input video path.")
+    # parser.add_argument("--feature_path", default="/vqhighlight/scenedetect_features/",
+    #                     type=str, help="output feature path.")
+    # parser.add_argument(
+    #     '--csv_folder', type=str, default="/vqhighlight",
+    #     help='output csv folder')
+    # parser.add_argument(
+    #     '--corrupted_id_file', type=str, default="",
+    #     help='corrupted id file')
+    # parser.add_argument(
+    #     '--scenedetect_folder', type=str, default="/vqhighlight/scenedetect27/"
+    #         )
+    parser.add_argument("--video_path", default="/saltpool0/data/pyp/vqhighlight/video/", type=str,
                         help="The input video path.")
-    parser.add_argument("--feature_path", default="/vqhighlight/scenedetect_features/",
+    parser.add_argument("--feature_path", default="/saltpool0/data/pyp/vqhighlight/scenedetect_features/",
                         type=str, help="output feature path.")
     parser.add_argument(
-        '--csv_folder', type=str, default="/vqhighlight",
+        '--csv_folder', type=str, default="/saltpool0/data/pyp/vqhighlight",
         help='output csv folder')
     parser.add_argument(
         '--corrupted_id_file', type=str, default="",
         help='corrupted id file')
     parser.add_argument(
-        '--scenedetect_folder', type=str, default="/vqhighlight/scenedetect27/"
+        '--scenedetect_folder', type=str, default="/saltpool0/data/pyp/vqhighlight/scenedetect27"
             )
     args = parser.parse_args()
     main(args)

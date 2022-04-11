@@ -1,6 +1,7 @@
 import torch as th
 import math
 import numpy as np
+# from zmq import frame
 from video_loader import VideoLoader
 from torch.utils.data import DataLoader
 import argparse
@@ -10,19 +11,24 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import os
 import clip
+import time
 
 
 parser = argparse.ArgumentParser(description='Easy video feature extractor')
 
 parser.add_argument(
     '--csv',
+    default="/saltpool0/data/pyp/vqhighlight/clip-vit_info.csv",
     type=str,
     help='input csv with video input path')
 parser.add_argument('--batch_size', type=int, default=64,
                     help='batch size')
 parser.add_argument(
-        '--clip_len', type=float, default=3/2,
+        '--clip_len', type=float, default=3.,
         help='decoding length of clip (in seconds)')
+parser.add_argument(
+        '--noclip_clip_len', type=float, default=1.,
+        help='when the pyscenecut does not produce clips (so whole clip as a cut), decoding length of clip (in seconds)')
 parser.add_argument(
         '--overwrite', action='store_true',
         help='allow overwrite output files')
@@ -34,14 +40,16 @@ parser.add_argument('--model_version', type=str, default="ViT-B/32",
                     choices=["ViT-B/32", "RN50x4"],
                     help='Num parallel thread for video decoding')
 parser.add_argument(
-        '--scenedetect_folder', type=str, default="/saltpool0/data/pyp/vqhighlight/scenedetect27/"
+        '--scenedetect_folder', type=str, default="/saltpool0/data/pyp/vqhighlight/scenedetect27"
             )
 args = parser.parse_args()
 
 # model_version = "RN50x4" # "RN50x4"  # "ViT-B/32"
+args.csv = os.path.join(os.path.dirname(args.csv), os.path.basename(args.scenedetect_folder)+"-clip-vit_info.csv")
 output_feat_size = 512 if args.model_version == "ViT-B/32" else 640
 dataset = VideoLoader(
     args.csv,
+    noclip_framerate=1/args.noclip_clip_len,
     framerate=1/args.clip_len,
     size=224 if args.model_version == "ViT-B/32" else 288,
     centercrop=True,
@@ -63,16 +71,19 @@ model, _ = clip.load(args.model_version, device="cuda")
 
 totatl_num_frames = 0
 with th.no_grad():
+    # s_time = time.time()
     for k, data in enumerate(tqdm(loader)):
+        # print(f"data time: {time.time() - s_time:.4f}")
         input_file = data['input'][0]
         output_file = data['output'][0]
         if args.model_version == "RN50x4":
             output_file = output_file.replace(
                 "clip-vit_features", "clip-rn50x4_features")
-        if os.path.isfile(output_file):
-            # print(f'Video {input_file} already processed.')
-            continue
-        elif not os.path.isfile(input_file):
+        # if os.path.isfile(output_file):
+        #     # print(f'Video {input_file} already processed.')
+        #     continue
+        # elif not os.path.isfile(input_file):
+        if not os.path.isfile(input_file):
             print(f'{input_file}, does not exist.\n')
         elif len(data['video'].shape) > 4:
             video = data['video'].squeeze(0)
@@ -93,16 +104,20 @@ with th.no_grad():
                     features = features.astype('float16')
                 feature_dict = {}
                 cur_s = 0
-                for i, cur_len in enumerate(data['all_len']):
-                    cur_e = cur_s + cur_len
-                    feature_dict[i] = features[cur_s:cur_e]
+                for ii, cur_len in enumerate(data['all_len']):
+                    cur_e = cur_s + cur_len[0]
+                    # print(cur_s, cur_e)
+                    feature_dict[ii] = features[cur_s:cur_e]
+                    cur_s = cur_e
                 totatl_num_frames += features.shape[0]
+                # print(feature_dict.keys())
                 # safeguard output path before saving
                 dirname = os.path.dirname(output_file)
                 if not os.path.exists(dirname):
                     print(f"Output directory {dirname} does not exists, creating...")
                     os.makedirs(dirname)
-                np.savez(output_file, *features_dict)
+                np.savez(output_file, *feature_dict)
+                # break
         else:
             print(f'{input_file}, failed at ffprobe.\n')
 

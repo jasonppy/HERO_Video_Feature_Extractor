@@ -107,7 +107,7 @@ with th.no_grad():
                 for ii, cur_len in enumerate(data['all_len']):
                     cur_e = cur_s + cur_len[0]
                     # print(cur_s, cur_e)
-                    feature_dict[ii] = features[cur_s:cur_e]
+                    feature_dict[str(ii)] = features[cur_s:cur_e]
                     cur_s = cur_e
                 totatl_num_frames += features.shape[0]
                 # print(feature_dict.keys())
@@ -116,7 +116,7 @@ with th.no_grad():
                 if not os.path.exists(dirname):
                     print(f"Output directory {dirname} does not exists, creating...")
                     os.makedirs(dirname)
-                np.savez(output_file, *feature_dict)
+                np.savez(output_file, **feature_dict)
                 # break
         else:
             print(f'{input_file}, failed at ffprobe.\n')
